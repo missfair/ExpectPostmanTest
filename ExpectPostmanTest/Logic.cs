@@ -17,7 +17,7 @@ namespace ExpectPostmanTest
             {
                 return new
                 {
-                    ErrorMessage = "ไม่สามารถแปลง json จาก body เป็น Objectได้ กรุณาเช็ค format อีกครั้ง"
+                    ErrorMessage = "ไม่สามารถแปลง json จาก body เป็น Objectได้ กรุณาเช็ค json format อีกครั้ง"
                 };
             }
 
@@ -57,13 +57,13 @@ namespace ExpectPostmanTest
                     {
                         script = pattern.Replace("[Index]", string.Empty);
                     }
-                    List<string> resultMaps = MapMockRegression(jResponse, script);
+                    List<string> resultMaps = MapMockRegression(jResponse, script).Where(a=> !string.IsNullOrEmpty(a)).ToList();
                     listExpectScripts.AddRange(resultMaps);
                 }
                 index++;
             }
             resultScripts = string.Join(Environment.NewLine, listExpectScripts);
-            return resultScripts;
+            return "var jsonData = pm.response.json();" + Environment.NewLine + resultScripts;
         }
 
         private static List<string> MapMockRegression(JToken jToken, string script)
@@ -77,18 +77,36 @@ namespace ExpectPostmanTest
                     scripts.AddRange(MapMockRegression(children, script));
                 }
             }
-            else if (childObjs.Count() == 1)
+            else if (childObjs.Count == 1)
             {
                 var childObj = childObjs.FirstOrDefault();
                 var path = childObj.Path;
-                var value = convertFormat(childObj.Value<string>());
-                string expectScript = mapExpectScript(script, path, value);
-                scripts.Add(expectScript + Environment.NewLine);
+                string value = "";
+                bool byPass = false;
+                try
+                {
+                    value = convertFormat(childObj.Value<string>()).ToLower();
+                }
+                catch (Exception)
+                {
+                    var childObjxx = childObj.Children().ToList();
+                    foreach (var item in childObjxx)
+                    {
+                        scripts.AddRange(MapMockRegression(item, script));
+                        byPass = true;
+                    }
+                }
+                if (!byPass)
+                {
+                    string expectScript = mapExpectScript(script, path, value);
+                    scripts.Add(expectScript + Environment.NewLine);
+                }
+
             }
             else if (childObjs.Count() == 0)
             {
                 var path = jToken.Path;
-                var value = convertFormat(jToken.Value<string>());
+                var value = convertFormat(jToken.Value<string>()).ToLower();
                 string expectScript = mapExpectScript(script, path, value);
                 scripts.Add(expectScript + Environment.NewLine);
             }
@@ -98,7 +116,7 @@ namespace ExpectPostmanTest
         public static string mapExpectScript(string script, string path, string value)
         {
             string expectPattern = @"pm.test( " + "\"Path is Value\"" + ", function () { Expect});";
-            string expectScript = script.Replace("ChildrenPath", path + ".toString()").Replace("Value", "'" + value + "'");
+            string expectScript = script.Replace("ChildrenPath", path + ".toString().toLowerCase()").Replace("Value", "'" + value + "'");
             expectScript = expectPattern.Replace("Path", path).Replace("Value", value).Replace("Expect", Environment.NewLine + "   " + expectScript + Environment.NewLine);
             return expectScript;
         }
