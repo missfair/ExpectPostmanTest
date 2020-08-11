@@ -106,9 +106,15 @@ namespace ExpectPostmanTest
             else if (childObjs.Count() == 0)
             {
                 var path = jToken.Path;
-                var value = convertFormat(jToken.Value<string>()).ToLower();
-                string expectScript = mapExpectScript(script, path, value);
-                scripts.Add(expectScript + Environment.NewLine);
+                try
+                {
+                    var value = convertFormat(jToken.Value<string>()).ToLower();
+                    string expectScript = mapExpectScript(script, path, value);
+                    scripts.Add(expectScript + Environment.NewLine);
+                }
+                catch (Exception)
+                {
+                }
             }
             return scripts;
         }
